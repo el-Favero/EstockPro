@@ -1,0 +1,31 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Função helper: verificar se o usuário está autenticado
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Função helper: verificar se o arquivo pertence ao usuário atual
+    // O path deve conter o UID do usuário (ex: /usuarios/UID_USER/...)
+    function isOwner() {
+      return request.auth.uid == bucket;
+    }
+
+    // === Arquivos de usuários ===
+    // Padrão: /usuarios/{userId}/{arquivo}
+    match /usuarios/{userId}/{allPaths=**} {
+      allow read: if isAuthenticated() && userId == request.auth.uid;
+      allow write: if isAuthenticated() && userId == request.auth.uid;
+      allow delete: if isAuthenticated() && userId == request.auth.uid;
+    }
+
+    // === Backups (se implementado) ===
+    // Padrão: /backups/{userId}/{arquivo}
+    match /backups/{userId}/{allPaths=**} {
+      allow read: if isAuthenticated() && userId == request.auth.uid;
+      allow write: if isAuthenticated() && userId == request.auth.uid;
+    }
+  }
+}

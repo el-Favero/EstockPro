@@ -1,0 +1,77 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Função helper: verificar se o usuário está autenticado
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Função helper: verificar se o documento pertence ao usuário atual
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // === Coleção: produtos ===
+    // Usuário só pode acessar seus propios produtos
+    match /produtos/{produtoId} {
+      // Permite leitura: usuário autenticado pode ler seus produtos
+      allow read: if isAuthenticated();
+      
+      // Permite criação: usuário autenticado cria documento com seu UID
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+      
+      // Permite atualização: usuário só pode editar seus propios produtos
+      allow update: if isAuthenticated()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
+      
+      // Permite exclusão: usuário só pode excluir seus propios produtos
+      allow delete: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+      
+      // Permite listagem: usuário autenticado vê apenas seus produtos
+      allow list: if isAuthenticated();
+    }
+
+    // === Coleção: movimentacoes ===
+    match /movimentacoes/{movimentacaoId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+      allow list: if isAuthenticated();
+    }
+
+    // === Coleção: alertas (se usar) ===
+    match /alertas/{alertaId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+      allow list: if isAuthenticated();
+    }
+
+    // === Coleção: observacoesDia ===
+    match /observacoesDia/{dataKey} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+      allow list: if isAuthenticated();
+    }
+  }
+}

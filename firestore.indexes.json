@@ -1,0 +1,51 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "produtos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASC"
+        },
+        {
+          "fieldPath": "nome",
+          "order": "ASC"
+        },
+        {
+          "fieldPath": "categoria",
+          "order": "ASC"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "produtos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASC"
+        },
+        {
+          "fieldPath": "codigoBarras",
+          "order": "ASC"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "movimentacoes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASC"
+        },
+        {
+          "fieldPath": "data",
+          "order": "DESC"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
