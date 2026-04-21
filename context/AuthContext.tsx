@@ -8,16 +8,27 @@ import {
   User,
   sendPasswordResetEmail,
 } from 'firebase/auth';
-import { auth } from '../src/firebaseConfig';
+
+let auth: any = null;
+let db: any = null;
+
+// Tentar importar Firebase - se falhar, usar placeholders
+try {
+  const firebaseModule = require('../src/firebaseConfig');
+  auth = firebaseModule.auth;
+  db = firebaseModule.db;
+} catch (e) {
+  console.log('Firebase não disponível:', e);
+}
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   enviarRedefinicaoSenha: (email: string) => Promise<void>;
+  firebaseReady: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -25,63 +36,47 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [firebaseReady, setFirebaseReady] = useState(!!auth);
 
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
+    if (!auth) {
+      console.log('Firebase auth não disponível');
+      setLoading(false);
+      return;
+    }
 
-    const initAuth = async () => {
-      timeoutId = setTimeout(() => {
-        console.log("Auth timeout - forcing loading to false");
-        setLoading(false);
-      }, 3000);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      console.log('Auth changed:', user?.email);
+      setUser(user);
+      setLoading(false);
+    });
 
-      try {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-          console.log("onAuthStateChanged:", user?.email, user?.uid);
-          setUser(user);
-          clearTimeout(timeoutId);
-          setLoading(false);
-        });
-
-        return unsubscribe;
-      } catch (error) {
-        console.log("Auth error:", error);
-        clearTimeout(timeoutId);
-        setLoading(false);
-      }
-    };
-
-    const cleanup = initAuth();
-
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      cleanup.then(unsubscribe => unsubscribe?.());
-    };
+    return unsubscribe;
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    if (!auth) throw new Error('Firebase não está disponível');
     await signInWithEmailAndPassword(auth, email, password);
   };
 
   const signUp = async (email: string, password: string) => {
+    if (!auth) throw new Error('Firebase não está disponível');
     await createUserWithEmailAndPassword(auth, email, password);
   };
 
-  const signInWithGoogle = async () => {
-    // Funcionalidade de login com Google desabilitada temporariamente
-    throw new Error('Login com Google não disponível');
-  };
-
   const logout = async () => {
+    if (!auth) return;
     try {
       await signOut(auth);
       setUser(null);
     } catch (error) {
-      console.error("Erro no logout:", error);
+      console.error('Logout error:', error);
+      setUser(null);
     }
   };
 
   const enviarRedefinicaoSenha = async (email: string) => {
+    if (!auth) throw new Error('Firebase não está disponível');
     await sendPasswordResetEmail(auth, email.trim());
   };
 
@@ -91,9 +86,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       loading, 
       signIn, 
       signUp, 
-      signInWithGoogle, 
       logout,
       enviarRedefinicaoSenha,
+      firebaseReady,
     }}>
       {children}
     </AuthContext.Provider>

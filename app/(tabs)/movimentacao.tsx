@@ -246,18 +246,18 @@ export default function Movimentacao() {
           <View style={styles.produtoSelector}>
             <View style={styles.produtoInputWrapper}>
               <Text style={styles.label}>Produto</Text>
-              <Pressable onPress={() => setModalVisible(true)}>
-                <View pointerEvents="none">
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Toque para buscar..."
-                    placeholderTextColor={colors.subtitle}
-                    value={buscaProduto}
-                    onChangeText={setBuscaProduto}
-                    onFocus={() => setModalVisible(true)}
-                  />
-                </View>
-              </Pressable>
+               <Pressable onPress={() => setModalVisible(true)}>
+                 <View style={{ pointerEvents: 'none' }}>
+                   <TextInput
+                     style={styles.input}
+                     placeholder="Toque para buscar..."
+                     placeholderTextColor={colors.subtitle}
+                     value={buscaProduto}
+                     onChangeText={setBuscaProduto}
+                     onFocus={() => setModalVisible(true)}
+                   />
+                 </View>
+               </Pressable>
             </View>
             <Pressable style={styles.scanButton} onPress={() => router.push({ pathname: '/escanear', params: { returnTo: 'movimentacao' } })}>
               <Ionicons name="camera-outline" size={22} color="#fff" />

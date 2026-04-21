@@ -14,6 +14,9 @@ interface AlertaEstoque {
 export function useAlertasEstoque() {
   const { produtos, carregarProdutos, produtosLoading } = useEstoque();
 
+  // Garantir que produtos é sempre um array
+  const safeProdutos = Array.isArray(produtos) ? produtos : [];
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const loading = produtosLoading;
 
@@ -36,7 +39,7 @@ export function useAlertasEstoque() {
   const alertasValidade = useMemo((): AlertaEstoque[] => {
     const alertas: AlertaEstoque[] = [];
     
-    for (const p of produtos) {
+    for (const p of safeProdutos) {
       const lotes = p.lotes || [];
       
       for (const lote of lotes) {
@@ -75,13 +78,13 @@ export function useAlertasEstoque() {
       const peso = { alta: 3, media: 2, baixa: 1 };
       return peso[b.gravidade] - peso[a.gravidade];
     });
-  }, [produtos]);
+  }, [safeProdutos]);
 
   // Alertas de estoque mínimo
   const alertasEstoqueMinimo = useMemo((): AlertaEstoque[] => {
     const alertas: AlertaEstoque[] = [];
     
-    for (const p of produtos) {
+    for (const p of safeProdutos) {
       // Verifica estoques mínimos por lote
       const lotes = p.lotes || [];
       
@@ -125,7 +128,7 @@ export function useAlertasEstoque() {
     }
     
     return alertas;
-  }, [produtos]);
+  }, [safeProdutos]);
 
   // Todos os alertas juntos
   const todosAlertas = useMemo((): AlertaEstoque[] => {

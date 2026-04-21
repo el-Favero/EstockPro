@@ -33,7 +33,23 @@ type PeriodTab = 'diario' | 'semanal' | 'mensal';
 export default function RelatorioScreen() {
   const { colors } = useTheme();
   const { produtos, movimentacoes, carregarProdutos, carregarMovimentacoes } = useEstoque();
-  
+
+  const isDark = colors.background === '#0f172a';
+
+  const textColor = colors.text || (isDark ? '#f1f5f9' : '#1a1a2e');
+  const subtitleColor = colors.subtitle || (isDark ? '#94a3b8' : '#666');
+  const bgSecondary = colors.card || (isDark ? '#1e293b' : '#f5f5f7');
+  const borderColor = colors.border || (isDark ? '#334155' : '#e2e8f0');
+  const bgColor = colors.background || (isDark ? '#0f172a' : '#ffffff');
+
+  const themedColors = {
+    primary: textColor,
+    tertiary: subtitleColor,
+    white: bgColor,
+    bgSecondary: bgSecondary,
+    border: borderColor,
+  };
+
   const [periodTab, setPeriodTab] = useState<PeriodTab>('semanal');
   const [periodOffset, setPeriodOffset] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
@@ -283,7 +299,7 @@ export default function RelatorioScreen() {
       {/* 1. Cabeçalho */}
       <View style={[styles.header, isMobile && styles.headerMobile]}>
         <View>
-          <Text style={[styles.title, { color: COLORS.primary }, isMobile && styles.titleMobile]}>
+          <Text style={[styles.title, { color: themedColors.primary }, isMobile && styles.titleMobile]}>
             Movimentações
           </Text>
           <Text style={[styles.subtitle, isMobile && styles.subtitleMobile]}>

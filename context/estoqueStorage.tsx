@@ -1,19 +1,59 @@
 // context/estoqueStorage.tsx
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
-import { auth } from '../src/firebaseConfig';
-import { onAuthStateChanged } from 'firebase/auth';
 import { Produto } from '../types/produto';
-import {
-  getProdutos,
-  createProduto,
-  updateProduto,
-  deleteProduto,
-  adicionarLoteOuCriarProduto as adicionarLoteOuCriarProdutoService,
-} from '../services/produtoService';
-import { registrarMovimentacao as registrarMovimentacaoService } from '../services/movimentacao/movimentacaoServices';
-import { MovimentacaoInput, Movimentacao } from '../services/movimentacao/types';
-import { getTodasMovimentacoes } from '../services/movimentacao/movimentacaoServices';
-import { fetchObservacoesPorDia, saveObservacaoDia } from '../services/observacaoDiaService';
+
+// Tentar importar Firebase com try/catch
+let auth: any = null;
+let db: any = null;
+
+try {
+  const firebaseModule = require('../src/firebaseConfig');
+  auth = firebaseModule.auth;
+  db = firebaseModule.db;
+} catch (e) {
+  console.log('Firebase não disponível em estoqueStorage:', e);
+}
+
+let onAuthStateChanged: any = null;
+let getProdutos: any = null;
+let getProduto: any = null;
+let createProduto: any = null;
+let updateProduto: any = null;
+let deleteProduto: any = null;
+let adicionarLoteOuCriarProduto: any = null;
+let getTodasMovimentacoes: any = null;
+let registrarMovimentacaoService: any = null;
+let fetchObservacoesPorDia: any = null;
+let saveObservacaoDia: any = null;
+
+if (auth && db) {
+  try {
+    const authModule = require('firebase/auth');
+    onAuthStateChanged = authModule.onAuthStateChanged;
+  } catch (e) {}
+  
+  try {
+    const produtoService = require('../services/produtoService');
+    getProdutos = produtoService.getProdutos;
+    getProduto = produtoService.getProduto;
+    createProduto = produtoService.createProduto;
+    updateProduto = produtoService.updateProduto;
+    deleteProduto = produtoService.deleteProduto;
+    adicionarLoteOuCriarProduto = produtoService.adicionarLoteOuCriarProduto;
+  } catch (e) {}
+  
+  try {
+    const movService = require('../services/movimentacao/movimentacaoServices');
+    getTodasMovimentacoes = movService.getTodasMovimentacoes;
+    registrarMovimentacaoService = movService.registrarMovimentacao;
+  } catch (e) {}
+  
+  try {
+    const obsService = require('../services/observacaoDiaService');
+    saveObservacaoDia = obsService.saveObservacaoDia;
+    fetchObservacoesPorDia = obsService.fetchObservacoesPorDia;
+  } catch (e) {}
+}
 
 export type CadastroLoteParams = {
   nome: string;
@@ -116,7 +156,7 @@ export const EstoqueProvider = ({ children }: { children: React.ReactNode }) => 
   };
 
   const cadastrarProdutoComLote = async (params: CadastroLoteParams) => {
-    const id = await adicionarLoteOuCriarProdutoService(params);
+    const id = await adicionarLoteOuCriarProduto(params);
     // Atualiza estado local - busca apenas o produto criado
     try {
       const { getProduto } = await import('../services/produtoService');
