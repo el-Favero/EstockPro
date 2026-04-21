@@ -42,12 +42,30 @@ export default function RelatorioScreen() {
   const borderColor = colors.border || (isDark ? '#334155' : '#e2e8f0');
   const bgColor = colors.background || (isDark ? '#0f172a' : '#ffffff');
 
+  // Cores dinâmicas baseadas no tema - substitui COLORS fixo
   const themedColors = {
     primary: textColor,
     tertiary: subtitleColor,
     white: bgColor,
-    bgSecondary: bgSecondary,
+    backgroundSecondary: bgSecondary,
+    entry: colors.success || '#00b894',
+    exit: colors.danger || '#6c5ce7',
+    alert: colors.warning || '#e17055',
+    accent: colors.accent || '#e8ff4a',
     border: borderColor,
+  };
+
+  // Sobrescreve COLORS para funcionar em Stylesheet.create
+  const COLORS_THEME = {
+    ...COLORS,
+    primary: themedColors.primary,
+    tertiary: themedColors.tertiary,
+    white: themedColors.white,
+    backgroundSecondary: themedColors.backgroundSecondary,
+    entry: themedColors.entry,
+    exit: themedColors.exit,
+    alert: themedColors.alert,
+    accent: themedColors.accent,
   };
 
   const [periodTab, setPeriodTab] = useState<PeriodTab>('semanal');
@@ -309,13 +327,13 @@ export default function RelatorioScreen() {
         {!isMobile ? (
           <View style={styles.headerButtons}>
             <TouchableOpacity 
-              style={[styles.btnOutline, { borderColor: COLORS.primary }]}
+              style={[styles.btnOutline, { borderColor: themedColors.primary }]}
               onPress={() => handleExportar('pdf')}
             >
-              <Text style={[styles.btnText, { color: COLORS.primary }]}>PDF</Text>
+              <Text style={[styles.btnText, { color: themedColors.primary }]}>PDF</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={[styles.btnFill, { backgroundColor: COLORS.primary }]}
+              style={[styles.btnFill, { backgroundColor: themedColors.primary }]}
               onPress={handleExportarCsv}
             >
               <Text style={[styles.btnText, { color: COLORS.accent }]}>Excel</Text>
@@ -333,12 +351,12 @@ export default function RelatorioScreen() {
               ]
             );
           }}>
-            <Text style={styles.downloadBtnText}>↓</Text>
+            <Text style={[styles.downloadBtnText, { color: themedColors.primary }]}>↓</Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {/* 2. Abas de período */}
+{/* 2. Abas de período */}
       <View style={styles.tabsContainer}>
         {(['diario', 'semanal', 'mensal'] as PeriodTab[]).map((tab) => (
           <TouchableOpacity
@@ -346,6 +364,8 @@ export default function RelatorioScreen() {
             style={[
               styles.tab,
               periodTab === tab && styles.tabActive,
+              { backgroundColor: periodTab === tab ? themedColors.primary : themedColors.white },
+              { borderColor: themedColors.border },
             ]}
             onPress={() => {
               setPeriodTab(tab);
@@ -354,7 +374,7 @@ export default function RelatorioScreen() {
           >
             <Text style={[
               styles.tabText,
-              periodTab === tab && styles.tabTextActive,
+              { color: periodTab === tab ? themedColors.primary : themedColors.tertiary },
             ]}>
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
             </Text>
@@ -368,13 +388,36 @@ export default function RelatorioScreen() {
           onPress={handlePrevPeriod} 
           style={[styles.navBtn, isMobile && styles.navBtnMobile]}
         >
-          <Text style={[styles.navBtnText, isMobile && styles.navBtnTextMobile]}>←</Text>
+          <Text style={[styles.navBtnText, { color: themedColors.primary }, isMobile && styles.navBtnTextMobile]}>←</Text>
         </TouchableOpacity>
-        <Text style={[styles.navLabel, isMobile && styles.navLabelMobile]}>
+        <Text style={[styles.navLabel, { color: themedColors.primary }, isMobile && styles.navLabelMobile]}>
           {periodoAtual.label}
         </Text>
         <TouchableOpacity onPress={handleHoje}>
-          <Text style={[styles.todayBtn, isMobile && styles.todayBtnMobile]}>Hoje</Text>
+          <Text style={[styles.todayBtn, { color: themedColors.primary }, isMobile && styles.todayBtnMobile]}>Hoje</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          onPress={handleNextPeriod} 
+          style={[styles.navBtn, periodOffset === 0 && styles.navBtnDisabled, isMobile && styles.navBtnMobile]}
+          disabled={periodOffset === 0}
+        >
+          <Text style={[styles.navBtnText, { color: themedColors.primary }, isMobile && styles.navBtnTextMobile]}>→</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* 3. Navegação de período */}
+      <View style={styles.navPeriod}>
+        <TouchableOpacity 
+          onPress={handlePrevPeriod} 
+          style={[styles.navBtn, isMobile && styles.navBtnMobile]}
+        >
+          <Text style={[styles.navBtnText, { color: themedColors.primary }, isMobile && styles.navBtnTextMobile]}>←</Text>
+        </TouchableOpacity>
+        <Text style={[styles.navLabel, { color: themedColors.primary }, isMobile && styles.navLabelMobile]}>
+          {periodoAtual.label}
+        </Text>
+        <TouchableOpacity onPress={handleHoje}>
+          <Text style={[styles.todayBtn, { color: themedColors.primary }, isMobile && styles.todayBtnMobile]}>Hoje</Text>
         </TouchableOpacity>
         <TouchableOpacity 
           onPress={handleNextPeriod} 
@@ -387,9 +430,9 @@ export default function RelatorioScreen() {
 
       {/* 4. Cards de métricas */}
       <View style={[styles.metricsGrid, isMobile && styles.metricsGridMobile]}>
-        {renderMetricaCard('entradas', metricas.entradas, COLORS.entry, '+')}
-        {renderMetricaCard('saídas', metricas.saidas, COLORS.exit, '−')}
-        {renderMetricaCard('produtos', metricas.produtosDistintos, COLORS.exit)}
+        {renderMetricaCard('entradas', metricas.entradas, isDark ? '#00b894' : '#22c55e', '+')}
+        {renderMetricaCard('saídas', metricas.saidas, isDark ? '#a78afa' : '#6c5ce7', '−')}
+        {renderMetricaCard('produtos', metricas.produtosDistintos, isDark ? '#a78afa' : '#6c5ce7')}
       </View>
 
       {/* 5. Registros detalhados */}

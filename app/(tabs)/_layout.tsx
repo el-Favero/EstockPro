@@ -3,7 +3,8 @@
 
 import { Tabs, router, usePathname } from 'expo-router';
 import React from 'react';
-import { View, SafeAreaView, StyleSheet, Pressable, Text } from 'react-native';
+import { View, StyleSheet, Pressable, Text } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 
@@ -73,6 +74,11 @@ function BottomNav() {
 
 export default function TabLayout() {
   const { user } = useAuth();
+
+  // Se não está logado, não mostra nada (o _layout raiz redireciona)
+  if (!user) {
+    return null;
+  }
 
   const getInitials = (name: string) => {
     if (!name) return 'U';

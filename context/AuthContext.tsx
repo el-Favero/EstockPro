@@ -9,17 +9,8 @@ import {
   sendPasswordResetEmail,
 } from 'firebase/auth';
 
-let auth: any = null;
-let db: any = null;
-
-// Tentar importar Firebase - se falhar, usar placeholders
-try {
-  const firebaseModule = require('../src/firebaseConfig');
-  auth = firebaseModule.auth;
-  db = firebaseModule.db;
-} catch (e) {
-  console.log('Firebase não disponível:', e);
-}
+// Imports estáticos - corretos e seguros
+import { auth, db } from '../src/firebaseConfig';
 
 interface AuthContextType {
   user: User | null;

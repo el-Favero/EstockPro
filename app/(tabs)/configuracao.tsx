@@ -5,14 +5,19 @@
 import React from 'react';
 import {
   Alert, Linking, ScrollView, StyleSheet,
-  Switch, Text, View, Pressable,
+  Switch, Text, View, Pressable,Platform
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext'; // ← ADICIONADO
+import { useState } from 'react';
 import { toast } from '../../utils/toast';
+import { ConfirmModal } from '@/components/confirmModal';
 
+
+const [modalSair, setModalSair] = useState(false);
+const [modalSenha, setModalSenha] = useState(false);
 const versaoApp = '1.0.0';
 
 const C = {
@@ -81,35 +86,25 @@ export default function Configuracoes() {
   const { logout, user, enviarRedefinicaoSenha } = useAuth();
   const { settings, updateSetting } = useSettings(); // ← ADICIONADO
 
-  const handleSair = () => {
-    Alert.alert('Sair da conta', 'Deseja realmente sair?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Sair', style: 'destructive',
-        onPress: async () => {
-          try { await logout(); }
-          catch { toast.error('Não foi possível sair. Tente novamente.'); }
-        },
-      },
-    ]);
-  };
+  const handleSair = () => setModalSair(true);
 
-  const handleAlterarSenha = () => {
-    const email = user?.email?.trim();
-    if (!email) { toast.error('E-mail não encontrado.'); return; }
-    Alert.alert('Redefinir senha', `Enviaremos um link para:\n${email}`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Enviar',
-        onPress: async () => {
-          try {
-            await enviarRedefinicaoSenha(email);
-            toast.success('Verifique sua caixa de entrada.');
-          } catch { toast.error('Não foi possível enviar.'); }
-        },
-      },
-    ]);
-  };
+  const handleAlterarSenha = () => setModalSenha(true);
+
+const confirmarAlterarSenha = async () => {
+  setModalSenha(false);
+  const email = user?.email?.trim();
+  if (!email) { toast.error('E-mail não encontrado.'); return; }
+  try {
+    await enviarRedefinicaoSenha(email);
+    toast.success('Verifique sua caixa de entrada.');
+  } catch { toast.error('Não foi possível enviar.'); }
+};
+
+const confirmarSair = async () => {
+  setModalSair(false);
+  try { await logout(); }
+  catch { toast.error('Não foi possível sair. Tente novamente.'); }
+};
 
   const primeiroNome = user?.displayName?.split(' ')[0] || user?.email?.split('@')[0] || 'Usuário';
   const email = user?.email || '—';

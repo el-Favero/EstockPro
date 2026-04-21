@@ -11,6 +11,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  Modal,
+  FlatList,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,6 +20,7 @@ import { useEstoque } from "../../context/estoqueStorage";
 import { useTheme } from "../../context/ThemeContext";
 import { formatarDataInput } from "../../utils/validadeUtils";
 import { toast } from "../../utils/toast";
+import { CATEGORIAS } from "../../constants/categorias";
 
 type Step = 1 | 2 | 3;
 
@@ -37,6 +40,7 @@ export default function CadastroProduto() {
 
   const [step, setStep] = useState<Step>(1);
   const [salvando, setSalvando] = useState(false);
+  const [modalCategoriaVisivel, setModalCategoriaVisivel] = useState(false);
 
   const [form, setForm] = useState<FormData>({
     nome: '',
@@ -165,16 +169,52 @@ export default function CadastroProduto() {
 
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>Categoria <Text style={styles.required}>*</Text></Text>
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            value={form.categoria}
-            onChangeText={(v) => updateForm('categoria', v)}
-            placeholder="Ex.: Grãos, Carnes, Limpeza..."
-            placeholderTextColor={colors.subtitle}
-          />
-        </View>
+        <TouchableOpacity
+          style={styles.inputContainer}
+          onPress={() => setModalCategoriaVisivel(true)}
+        >
+          <Text style={[styles.input, !form.categoria && styles.inputPlaceholder]}>
+            {form.categoria || 'Selecione uma categoria'}
+          </Text>
+          <Ionicons name="chevron-down" size={20} color={colors.subtitle} />
+        </TouchableOpacity>
       </View>
+
+      <Modal visible={modalCategoriaVisivel} transparent animationType="fade">
+        <Pressable style={styles.modalOverlay} onPress={() => setModalCategoriaVisivel(false)}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Selecionar Categoria</Text>
+              <TouchableOpacity onPress={() => setModalCategoriaVisivel(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={CATEGORIAS as unknown as string[]}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.categoriaItem,
+                    form.categoria === item && { backgroundColor: `${colors.icon}20` },
+                  ]}
+                  onPress={() => {
+                    updateForm('categoria', item);
+                    setModalCategoriaVisivel(false);
+                  }}
+                >
+                  <Text style={[styles.categoriaText, form.categoria === item && { color: colors.icon }]}>
+                    {item}
+                  </Text>
+                  {form.categoria === item && (
+                    <Ionicons name="checkmark" size={20} color={colors.icon} />
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </Pressable>
+      </Modal>
 
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>Código de barras</Text>
@@ -461,7 +501,42 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.text,
     fontSize: 15,
   },
+  inputPlaceholder: { color: colors.subtitle },
   textArea: { minHeight: 80, textAlignVertical: 'top' },
+  
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    maxHeight: '70%',
+    borderRadius: 16,
+    padding: 16,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '600', color: colors.text },
+  categoriaItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginBottom: 4,
+  },
+  categoriaText: { fontSize: 16, color: colors.text },
   
   row: { flexDirection: 'row', gap: 10 },
   scanButton: { 

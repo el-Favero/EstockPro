@@ -1,9 +1,9 @@
 // app/(tabs)/movimentacao.tsx
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { MovimentacaoInput } from '../../services/movimentacao/types'; 
+import { LoteProduto } from '../../types/produto';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Modal,
   RefreshControl,
@@ -21,9 +21,13 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useEstoque } from '../../context/estoqueStorage';
 import { useTheme } from '../../context/ThemeContext';
-import { FEEDBACK } from '../../constants/feedbackMessages';
 import { toast } from '../../utils/toast';
 import { Produto } from '../../types/produto';
+import { ConfirmModal } from '@/components/confirmModal';
+import { validadeParaExibicao } from '../../utils/validadeUtils';
+import { CATEGORIAS } from '../../constants/categorias';
+
+const [modalConfirm, setModalConfirm] = useState<{ data: MovimentacaoInput; resumo: string; lotesInfo?: string } | null>(null);
 
 export default function Movimentacao() {
   const router = useRouter();
@@ -40,7 +44,7 @@ export default function Movimentacao() {
   const [quantidadeUnidades, setQuantidadeUnidades] = useState('');
   const [quantidadeKg, setQuantidadeKg] = useState('');
   const [finalidade, setFinalidade] = useState('');
-  const [validade, setValidade] = useState('');
+  const [lotesSelecionados, setLotesSelecionados] = useState<Record<string, { un: number; kg: number }>>({});
   const [salvando, setSalvando] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -64,9 +68,24 @@ export default function Movimentacao() {
     }
   }, [carregarProdutos, carregarMovimentacoes]);
 
+  const produtosAgrupados = useMemo(() => {
+    if (!produtos || !produtos.length) return {};
+    
+    const grupos: Record<string, Produto[]> = {};
+    CATEGORIAS.forEach(cat => { grupos[cat] = []; });
+    grupos['Outros'] = [];
+    
+    produtos.forEach(p => {
+      const cat = p.categoria || 'Outros';
+      if (!grupos[cat]) grupos[cat] = [];
+      grupos[cat].push(p);
+    });
+    
+    return grupos;
+  }, [produtos]);
+
   const produtosFiltrados = useMemo(() => {
-    if (!produtos || !produtos.length) return [];
-    if (!buscaProduto.trim()) return produtos;
+    if (!buscaProduto.trim()) return null;
     return produtos.filter(p => 
       p && p.nome && p.nome.toLowerCase().includes(buscaProduto.toLowerCase()) ||
       (p.categoria || '').toLowerCase().includes(buscaProduto.toLowerCase())
@@ -79,15 +98,32 @@ export default function Movimentacao() {
     setModalVisible(false);
     setQuantidadeUnidades('');
     setQuantidadeKg('');
-    setValidade('');
+    setLotesSelecionados({});
   };
 
   const handleTipoChange = (novoTipo: 'retirada' | 'retorno') => {
     setTipo(novoTipo);
-    if (novoTipo === 'retirada') {
-      setValidade('');
-    }
+    setLotesSelecionados({});
   };
+
+  const handleQtdLoteChange = (loteId: string, campo: 'un' | 'kg', valor: number) => {
+    setLotesSelecionados(prev => ({
+      ...prev,
+      [loteId]: {
+        ...(prev[loteId] || { un: 0, kg: 0 }),
+        [campo]: valor,
+      }
+    }));
+  };
+
+  const totalSelecionado = useMemo(() => {
+    let un = 0, kg = 0;
+    Object.values(lotesSelecionados).forEach(l => {
+      un += l.un || 0;
+      kg += l.kg || 0;
+    });
+    return { un, kg };
+  }, [lotesSelecionados]);
 
   const executarMovimentacao = async (movimentacaoData: MovimentacaoInput) => {
     setSalvando(true);
@@ -97,9 +133,9 @@ export default function Movimentacao() {
       setQuantidadeUnidades('');
       setQuantidadeKg('');
       setFinalidade('');
+      setLotesSelecionados({});
       setProdutoSelecionado(null);
       setBuscaProduto('');
-      setValidade('');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : '';
       toast.error(msg || 'Erro ao registrar movimentação');
@@ -116,18 +152,20 @@ export default function Movimentacao() {
 
     const temUnidades = quantidadeUnidades.trim() !== '';
     const temKg = quantidadeKg.trim() !== '';
+    const unidades = Number(quantidadeUnidades || 0);
+    const kg = Number(quantidadeKg || 0);
 
     if (!temUnidades && !temKg) {
       toast.error('Informe a quantidade');
       return;
     }
 
-    if (temUnidades && (!/^\d+$/.test(quantidadeUnidades) || Number(quantidadeUnidades) <= 0)) {
+    if (temUnidades && (!/^\d+$/.test(quantidadeUnidades) || unidades <= 0)) {
       toast.error('Informe um número válido de unidades');
       return;
     }
 
-    if (temKg && (!/^\d*\.?\d+$/.test(quantidadeKg) || Number(quantidadeKg) <= 0)) {
+    if (temKg && (!/^\d*\.?\d+$/.test(quantidadeKg) || kg <= 0)) {
       toast.error('Informe um valor válido em kg');
       return;
     }
@@ -137,15 +175,12 @@ export default function Movimentacao() {
       return;
     }
 
-    const unidades = Number(quantidadeUnidades || 0);
-    const kg = Number(quantidadeKg || 0);
-
     if (tipo === 'retirada') {
-      if (unidades > produtoSelecionado.quantidade) {
+      if (temUnidades && unidades > produtoSelecionado.quantidade) {
         toast.error(`Estoque insuficiente: ${produtoSelecionado.quantidade} un`);
         return;
       }
-      if (produtoSelecionado.quantidadeKg && kg > produtoSelecionado.quantidadeKg) {
+      if (temKg && produtoSelecionado.quantidadeKg && kg > produtoSelecionado.quantidadeKg) {
         toast.error(`Estoque insuficiente: ${produtoSelecionado.quantidadeKg} kg`);
         return;
       }
@@ -158,23 +193,26 @@ export default function Movimentacao() {
     };
     if (temUnidades) movimentacaoData.quantidadeUnidades = unidades;
     if (temKg) movimentacaoData.quantidadeKg = kg;
-    if (tipo === 'retorno' && validade.trim()) movimentacaoData.observacao = validade.trim();
 
     const resumoUn = temUnidades ? `${unidades} un` : '';
     const resumoKg = temKg ? `${kg} kg` : '';
     const resumoQtd = [resumoUn, resumoKg].filter(Boolean).join(' + ');
     const acao = tipo === 'retirada' ? 'Retirada' : 'Retorno';
 
-    Alert.alert(
-      'Confirmar movimentação',
-      `${acao}: ${produtoSelecionado.nome}\nQuantidade: ${resumoQtd}${tipo === 'retirada' ? `\nFinalidade: ${finalidade.trim()}` : ''}`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Confirmar', onPress: () => void executarMovimentacao(movimentacaoData) },
-      ]
-    );
-  };
+    let lotesInfo = '';
+    if (tipo === 'retirada' && produtoSelecionado.lotes && produtoSelecionado.lotes.length > 0) {
+      const lotesAtivos = produtoSelecionado.lotes.filter(l => (l.quantidadeUnidades || 0) > 0 || (l.quantidadeKg || 0) > 0);
+      if (lotesAtivos.length > 1) {
+        lotesInfo = `\n${lotesAtivos.length} lotes disponíveis`;
+      }
+    }
 
+    setModalConfirm({ 
+      data: movimentacaoData, 
+      resumo: `${acao}: ${produtoSelecionado.nome}\nQuantidade: ${resumoQtd}${tipo === 'retirada' ? `\nFinalidade: ${finalidade.trim()}` : ''}`,
+      lotesInfo
+    });
+  };
   const TipoToggle = ({ tipo, onChange }: { tipo: 'retirada' | 'retorno'; onChange: (t: 'retirada' | 'retorno') => void }) => (
     <View style={styles.toggleContainer}>
       <Pressable 
@@ -246,18 +284,16 @@ export default function Movimentacao() {
           <View style={styles.produtoSelector}>
             <View style={styles.produtoInputWrapper}>
               <Text style={styles.label}>Produto</Text>
-               <Pressable onPress={() => setModalVisible(true)}>
-                 <View style={{ pointerEvents: 'none' }}>
-                   <TextInput
-                     style={styles.input}
-                     placeholder="Toque para buscar..."
-                     placeholderTextColor={colors.subtitle}
-                     value={buscaProduto}
-                     onChangeText={setBuscaProduto}
-                     onFocus={() => setModalVisible(true)}
-                   />
-                 </View>
-               </Pressable>
+             <Pressable onPress={() => setModalVisible(true)}>
+  <TextInput
+    style={styles.input}
+    placeholder="Toque para buscar..."
+    placeholderTextColor={colors.subtitle}
+    value={buscaProduto}
+    editable={false}
+    onFocus={() => setModalVisible(true)}
+  />
+</Pressable>
             </View>
             <Pressable style={styles.scanButton} onPress={() => router.push({ pathname: '/escanear', params: { returnTo: 'movimentacao' } })}>
               <Ionicons name="camera-outline" size={22} color="#fff" />
@@ -314,22 +350,6 @@ export default function Movimentacao() {
 
           <Text style={styles.hint}>Preencha ao menos um dos campos acima</Text>
 
-          {tipo === 'retorno' && (
-            <>
-              <Text style={styles.label}>Validade do lote</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="DD/MM/AAAA"
-                placeholderTextColor={colors.subtitle}
-                value={validade}
-                onChangeText={setValidade}
-                keyboardType="number-pad"
-                maxLength={10}
-              />
-              <Text style={[styles.hint, { marginTop: 4 }]}>Data de validade do produto. Se vazio, usa hoje + 30 dias.</Text>
-            </>
-          )}
-
           {tipo === 'retirada' && (
             <>
               <Text style={styles.label}>Finalidade</Text>
@@ -341,6 +361,59 @@ export default function Movimentacao() {
                 onChangeText={setFinalidade}
               />
             </>
+          )}
+
+          {tipo === 'retirada' && produtoSelecionado?.lotes && produtoSelecionado.lotes.length > 0 && (
+            <View style={styles.lotesSection}>
+              <Text style={styles.lotesTitle}>Selecione os lotes para retirada</Text>
+              {produtoSelecionado.lotes.map((lote, idx) => {
+                const disponivel = (lote.quantidadeUnidades || 0) > 0 || (lote.quantidadeKg || 0) > 0;
+                if (!disponivel) return null;
+                return (
+                  <View key={lote.id || idx} style={styles.loteCard}>
+                    <View style={styles.loteHeader}>
+                      <Ionicons name="calendar-outline" size={16} color={colors.icon} />
+                      <Text style={styles.loteValidade}>
+                        Vence: {validadeParaExibicao(lote.validade)}
+                      </Text>
+                    </View>
+                    <View style={styles.loteQuantidades}>
+                      {lote.quantidadeUnidades !== undefined && (
+                        <View style={styles.loteQtdBox}>
+                          <Text style={styles.loteQtdLabel}>Unidades</Text>
+                          <Text style={styles.loteQtdDisponivel}>{lote.quantidadeUnidades} un</Text>
+                          <TextInput
+                            style={styles.loteQtdInput}
+                            keyboardType="numeric"
+                            placeholder="0"
+                            value={lotesSelecionados[lote.id!]?.un?.toString() || ''}
+                            onChangeText={(v) => handleQtdLoteChange(lote.id!, 'un', Number(v) || 0)}
+                          />
+                        </View>
+                      )}
+                      {lote.quantidadeKg !== undefined && (
+                        <View style={styles.loteQtdBox}>
+                          <Text style={styles.loteQtdLabel}>Quilogramas</Text>
+                          <Text style={styles.loteQtdDisponivel}>{lote.quantidadeKg} kg</Text>
+                          <TextInput
+                            style={styles.loteQtdInput}
+                            keyboardType="numeric"
+                            placeholder="0"
+                            value={lotesSelecionados[lote.id!]?.kg?.toString() || ''}
+                            onChangeText={(v) => handleQtdLoteChange(lote.id!, 'kg', Number(v) || 0)}
+                          />
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+              {totalSelecionado.un > 0 || totalSelecionado.kg > 0 ? (
+                <Text style={styles.totalSelecionado}>
+                  Total selecionado: {totalSelecionado.un > 0 ? `${totalSelecionado.un} un` : ''} {totalSelecionado.kg > 0 ? `${totalSelecionado.kg} kg` : ''}
+                </Text>
+              ) : null}
+            </View>
           )}
 
           <Pressable
@@ -365,6 +438,22 @@ export default function Movimentacao() {
           </Pressable>
         </View>
       </ScrollView>
+
+<ConfirmModal
+  visible={!!modalConfirm}
+  title="Confirmar movimentação"
+  message={modalConfirm?.resumo || ''}
+  confirmLabel={tipo === 'retirada' ? 'Confirmar Retirada' : 'Confirmar Retorno'}
+  confirmColor={tipo === 'retirada' ? '#ef4444' : '#22c55e'}
+  icon={tipo === 'retirada' ? 'arrow-up-circle-outline' : 'arrow-down-circle-outline'}
+  iconColor={tipo === 'retirada' ? '#ef4444' : '#22c55e'}
+  onConfirm={() => {
+    if (!modalConfirm) return;
+    setModalConfirm(null);
+    void executarMovimentacao(modalConfirm.data);
+  }}
+  onCancel={() => setModalConfirm(null)}
+/>
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
@@ -392,7 +481,7 @@ export default function Movimentacao() {
               <View style={{ padding: 32, alignItems: 'center' }}>
                 <ActivityIndicator size="large" color={colors.icon} />
               </View>
-            ) : (
+            ) : produtosFiltrados ? (
               <FlatList
                 data={produtosFiltrados}
                 keyExtractor={(item) => item.id}
@@ -404,6 +493,31 @@ export default function Movimentacao() {
                 renderItem={({ item }) => (
                   <ProdutoItem produto={item} onSelect={() => handleSelecionarProduto(item)} />
                 )}
+                showsVerticalScrollIndicator={false}
+              />
+            ) : (
+              <FlatList
+                data={[]}
+                keyExtractor={() => 'header'}
+                renderItem={() => null}
+                ListHeaderComponent={
+                  <FlatList
+                    data={Object.entries(produtosAgrupados)}
+                    keyExtractor={([cat]) => cat}
+                    renderItem={({ item: [categoria, prods] }) => {
+                      if (!prods.length) return null;
+                      return (
+                        <View style={styles.categoriaGroup}>
+                          <Text style={styles.categoriaGroupTitle}>{categoria}</Text>
+                          {prods.map(p => (
+                            <ProdutoItem key={p.id} produto={p} onSelect={() => handleSelecionarProduto(p)} />
+                          ))}
+                        </View>
+                      );
+                    }}
+                    showsVerticalScrollIndicator={false}
+                  />
+                }
                 showsVerticalScrollIndicator={false}
               />
             )}
@@ -475,4 +589,19 @@ const createStyles = (colors: any) => StyleSheet.create({
   produtoItemCategoria: { fontSize: 12, color: colors.subtitle },
   produtoItemRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   produtoItemQtd: { fontSize: 13, color: colors.subtitle },
+  
+  lotesSection: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.border },
+  lotesTitle: { fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: 12 },
+  loteCard: { backgroundColor: colors.background, borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: colors.border },
+  loteHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  loteValidade: { fontSize: 13, fontWeight: '600', color: colors.icon },
+  loteQuantidades: { flexDirection: 'row', gap: 12 },
+  loteQtdBox: { flex: 1 },
+  loteQtdLabel: { fontSize: 11, color: colors.subtitle, marginBottom: 4 },
+  loteQtdDisponivel: { fontSize: 12, color: colors.success, marginBottom: 6 },
+  loteQtdInput: { backgroundColor: colors.card, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 10, fontSize: 14, fontWeight: '600', color: colors.text, textAlign: 'center' },
+  totalSelecionado: { fontSize: 13, fontWeight: '600', color: colors.icon, marginTop: 8, textAlign: 'right' },
+  
+  categoriaGroup: { marginBottom: 16 },
+  categoriaGroupTitle: { fontSize: 12, fontWeight: '700', color: colors.subtitle, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 },
 });

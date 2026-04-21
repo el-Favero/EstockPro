@@ -7,19 +7,24 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  Alert,
   ActivityIndicator,
   RefreshControl,
   Pressable,
+  Platform,
+  ScrollView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { ConfirmModal } from '@/components/confirmModal'
 import { useEstoque } from '../../context/estoqueStorage';
 import { useTheme } from '../../context/ThemeContext';
 import { useAlertasEstoque } from '../../hooks/useAlertasEstoque';
 import { Produto } from '../../types/produto';
 import { FEEDBACK } from '../../constants/feedbackMessages';
 import { toast } from '../../utils/toast';
+import { CATEGORIAS } from '../../constants/categorias';
+
+
 
 export default function EstoqueScreen() {
   const router = useRouter();
@@ -54,7 +59,9 @@ export default function EstoqueScreen() {
   
   const [busca, setBusca] = useState('');
   const [filtro, setFiltro] = useState<'todos' | 'alertas'>('todos');
+  const [filtroCategoria, setFiltroCategoria] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [modalDelete, setModalDelete] = useState<Produto | null>(null);
 
   useEffect(() => {
     if (buscaParam) setBusca(buscaParam);
@@ -84,6 +91,10 @@ export default function EstoqueScreen() {
   const produtosFiltrados = useMemo(() => {
     let lista = produtos;
     
+    if (filtroCategoria) {
+      lista = lista.filter(p => p.categoria === filtroCategoria);
+    }
+    
     if (busca.trim()) {
       const q = busca.toLowerCase();
       lista = lista.filter(
@@ -102,17 +113,9 @@ export default function EstoqueScreen() {
     }
     
     return lista;
-  }, [produtos, busca, filtro, alertasEstoque, alertasValidade]);
+  }, [produtos, busca, filtro, filtroCategoria, alertasEstoque, alertasValidade]);
 
-  const handleDelete = (produto: Produto) => {
-    Alert.alert('Excluir Produto', `Tem certeza que deseja excluir ${produto.nome}?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Excluir', style: 'destructive', onPress: async () => {
-        try { await removerProduto(produto.id); }
-        catch { toast.error(FEEDBACK.error.excluirProduto); }
-      }}
-    ]);
-  };
+const handleDelete = (produto: Produto) => setModalDelete(produto);
 
   const getStatusProduto = (produto: Produto) => {
     if (isProdutoVencido(produto.id)) return 'vencido';
@@ -123,7 +126,7 @@ export default function EstoqueScreen() {
 
   const styles = createStyles(colors);
 
-  const StatusBadge = ({ status }: { status: string }) => {
+  const StatusBadge = ({ status, colors }: { status: string; colors: any }) => {
     const config: Record<string, { bg: string; color: string; icon: string; label: string }> = {
       vencido: { bg: 'rgba(239,68,68,0.15)', color: colors.danger, icon: 'alert-circle', label: 'Vencido' },
       vencendo: { bg: 'rgba(245,158,11,0.15)', color: colors.warning, icon: 'warning', label: 'Vencendo' },
@@ -142,22 +145,24 @@ export default function EstoqueScreen() {
   };
 
   const ProdutoCard = ({ 
-    produto, 
-    status, 
-    onEdit, 
-    onDelete,
-    onVerLotes,
-    totalLotes,
-    lotesProximos,
-  }: { 
-    produto: Produto; 
-    status: string;
-    onEdit: () => void;
-    onDelete: () => void;
-    onVerLotes: () => void;
-    totalLotes: number;
-    lotesProximos: number;
-  }) => {
+  produto, 
+  status, 
+  onEdit, 
+  onDelete,
+  onVerLotes,
+  totalLotes,
+  lotesProximos,
+  colors,
+}: { 
+  produto: Produto; 
+  status: string;
+  onEdit: () => void;
+  onDelete: () => void;
+  onVerLotes: () => void;
+  totalLotes: number;
+  lotesProximos: number;
+  colors: any;
+}) => {
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
@@ -165,7 +170,7 @@ export default function EstoqueScreen() {
             <Text style={styles.produtoNome}>{produto.nome}</Text>
             <Text style={styles.produtoCategoria}>{produto.categoria}</Text>
           </View>
-          {status !== 'normal' && <StatusBadge status={status} />}
+          {status !== 'normal' && <StatusBadge status={status} colors={colors} />}
         </View>
         
         <View style={styles.infoGrid}>
@@ -213,7 +218,7 @@ export default function EstoqueScreen() {
               <Text style={styles.lotesText}>{totalLotes} lote(s)</Text>
             </View>
             {lotesProximos > 0 && (
-              <View style={styles.lotesAlert}>
+              <View style={styles.lotsAlert}>
                 <Text style={styles.lotesAlertText}>{lotesProximos} próximos vencer</Text>
               </View>
             )}
@@ -255,20 +260,18 @@ export default function EstoqueScreen() {
         status={status}
         onEdit={() => router.push(`/editar-produto?id=${item.id}`)}
         onDelete={() => handleDelete(item)}
-        onVerLotes={() => {
-          Alert.alert(
-            'Lotes do Produto',
-            item.lotes?.map(l => 
-              `${new Date(l.validade).toLocaleDateString('pt-BR')}: ${
-                l.quantidadeUnidades ? `${l.quantidadeUnidades} un` : ''
-              } ${
-                l.quantidadeKg ? `${l.quantidadeKg} kg` : ''
-              }`
-            ).join('\n\n')
-          );
-        }}
+        onVerLotes={() => toast.success(
+  item.lotes?.map(l => 
+    `${new Date(l.validade).toLocaleDateString('pt-BR')}: ${
+      l.quantidadeUnidades ? `${l.quantidadeUnidades} un` : ''
+    } ${
+      l.quantidadeKg ? `${l.quantidadeKg} kg` : ''
+    }`
+  ).join(' | ') || 'Sem lotes'
+)}
         totalLotes={totalLotes}
         lotesProximos={lotesProximos}
+         colors={colors}
       />
     );
   };
@@ -313,6 +316,24 @@ export default function EstoqueScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriaFilterContainer} contentContainerStyle={styles.categoriaFilterContent}>
+        <TouchableOpacity
+          style={[styles.categoriaChip, !filtroCategoria && styles.categoriaChipAtivo]}
+          onPress={() => setFiltroCategoria(null)}
+        >
+          <Text style={[styles.categoriaChipText, !filtroCategoria && styles.categoriaChipTextAtivo]}>Todos</Text>
+        </TouchableOpacity>
+        {CATEGORIAS.map((cat) => (
+          <TouchableOpacity
+            key={cat}
+            style={[styles.categoriaChip, filtroCategoria === cat && styles.categoriaChipAtivo]}
+            onPress={() => setFiltroCategoria(filtroCategoria === cat ? null : cat)}
+          >
+            <Text style={[styles.categoriaChipText, filtroCategoria === cat && styles.categoriaChipTextAtivo]}>{cat}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
     </>
   );
 
@@ -354,6 +375,22 @@ export default function EstoqueScreen() {
           />
         }
       />
+      <ConfirmModal
+  visible={!!modalDelete}
+  title="Excluir produto"
+  message={`Tem certeza que deseja excluir ${modalDelete?.nome}?`}
+  confirmLabel="Excluir"
+  confirmColor="#ef4444"
+  icon="trash-outline"
+  iconColor="#ef4444"
+  onConfirm={async () => {
+    if (!modalDelete) return;
+    setModalDelete(null);
+    try { await removerProduto(modalDelete.id); }
+    catch { toast.error(FEEDBACK.error.excluirProduto); }
+  }}
+  onCancel={() => setModalDelete(null)}
+/>
     </View>
   );
 }
@@ -399,6 +436,20 @@ const createStyles = (colors: any) => StyleSheet.create({
   filterButtonAtivo: { backgroundColor: colors.icon, borderColor: colors.icon },
   filterText: { color: colors.subtitle, fontWeight: '500', fontSize: 13 },
   filterTextAtivo: { color: '#fff' },
+  
+  categoriaFilterContainer: { maxHeight: 44, paddingBottom: 12 },
+  categoriaFilterContent: { paddingHorizontal: 16, gap: 8, flexDirection: 'row' },
+  categoriaChip: { 
+    paddingHorizontal: 14, 
+    paddingVertical: 8, 
+    borderRadius: 20, 
+    backgroundColor: colors.card, 
+    borderWidth: 1, 
+    borderColor: colors.border 
+  },
+  categoriaChipAtivo: { backgroundColor: colors.icon, borderColor: colors.icon },
+  categoriaChipText: { fontSize: 13, fontWeight: '500', color: colors.subtitle },
+  categoriaChipTextAtivo: { color: '#fff' },
   
   list: { paddingHorizontal: 16, paddingBottom: 100 },
   
